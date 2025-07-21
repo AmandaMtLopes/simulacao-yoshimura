@@ -1,0 +1,703 @@
+function yoshimura_interface_final() 
+%% YOSHIMURA_INTERFACE_FINAL – Interface segura + avançada
+% Amanda Monteiro Gonçalves – Jul/2025
+%-------------------------------
+%% --- Fecha todas as UIFigures abertas -------------------------------
+oldFigs = findall(groot,'Type','Figure');
+delete(oldFigs);
+
+%% --- Janela principal ---------------------------------------------------
+scr     = get(0,'ScreenSize');
+figSize = [1400 780];
+figPos  = [ (scr(3)-figSize(1))/2, (scr(4)-figSize(2))/2, figSize ];
+fig = uifigure('Name','Yoshimura Interativa','Position',figPos,'Color',[0.97 0.97 1]);
+
+data.t = []; data.d = []; data.v = []; data.show = [];
+lastTime = tic;
+fig.UserData = data;
+
+%% --- Painel de Abas ----------------------------------------------------
+panW = 420;
+tabGroup = uitabgroup(fig, 'Position', [10 10 panW figSize(2)-20]);
+
+abaControles = uitab(tabGroup, 'Title', 'Controles');
+abaInfo      = uitab(tabGroup, 'Title', 'Informações');
+
+painelTitulo = uipanel(fig, ...
+    'Position', [panW+30, figSize(2)-50, figSize(1)-panW-40, 40], ...  % largura ampliada
+    'BackgroundColor', [0.9 0.95 1], ...
+    'BorderType', 'none');
+
+uilabel(painelTitulo, ...
+    'Text', 'Yoshimura Simulation — Estrutura articulada com controle angular por camada', ...
+    'FontSize', 16, 'FontWeight', 'bold', ...
+    'HorizontalAlignment', 'center', ...
+    'Position', [10 5 painelTitulo.Position(3)-20 30]);
+
+%% --- Campos numéricos (em abaControles) -------------------------------
+y0 = figSize(2)-90;
+uilabel(abaControles,'Text','Comprimento l1 [mm]','FontWeight','bold','Position',[10 y0+10 150 22]);
+l1Field = uieditfield(abaControles,'numeric','Value',10.5,'Tag','l1','Position',[160 y0+10 60 24]);
+
+uilabel(abaControles,'Text','Comprimento l3 [mm]','FontWeight','bold','Position',[10 y0-20 150 22]);
+l3Field = uieditfield(abaControles,'numeric','Value',20.5,'Tag','l3','Position',[160 y0-20 60 24]);
+
+uilabel(abaControles,'Text','Réplicas eixo X','FontWeight','bold','Position',[10 y0-50 150 22]);
+camadasXField = uieditfield(abaControles,'numeric','Value',2,'Tag','camadasX','RoundFractionalValues','on','Position',[160 y0-50 60 24]);
+
+uilabel(abaControles,'Text','Velocidade [s]','FontWeight','bold','Position',[10 y0-80 150 22]);
+velField = uieditfield(abaControles,'numeric','Value',0.05,'Tag','velocidade','Position',[160 y0-80 60 24]);
+
+% ➤ Passo de avanço
+uilabel(abaControles,'Text','Passo de avanço','FontWeight','bold','Position',[10 y0-110 150 22]);
+passoField = uieditfield(abaControles,'numeric','Value',0.5,'Tag','passo','Position',[160 y0-110 60 24]);
+
+% uilabel(abaControles,'Text','Fator de abertura','FontWeight','bold','Position',[10 y0-120 150 22]);
+% fatorField = uieditfield(abaControles,'numeric','Value',1,'Tag','fatorAbertura','Position',[160 y0-120 60 24]);
+
+uilabel(abaControles,'Text','Pausar em d','FontWeight','bold','Position',[10 y0-200 100 22]); 
+pauseField = uieditfield(abaControles,'numeric','Value',0,'Tag','d_pause','Position',[110 y0-200 50 24]);
+
+uilabel(abaControles,'Text','por (s)','FontWeight','bold','Position',[170 y0-200 50 22]);
+pauseTimeField = uieditfield(abaControles,'numeric','Value',1.5,'Tag','pause_time','Position',[220 y0-200 50 24]);
+
+% ➤ Limite mínimo de d
+uilabel(abaControles, 'Text', 'Limite mínimo d', 'FontWeight', 'bold','Position', [10 y0-140 150 22]);
+dMinField = uieditfield(abaControles, 'numeric', 'Value', 0.1, 'Tag', 'd_min', 'Position', [160 y0-140 60 24]);
+
+% ➤ Limite máximo de d
+uilabel(abaControles, 'Text', 'Limite máximo d', 'FontWeight', 'bold',  'Position', [10 y0-170 150 22]);
+dMaxField = uieditfield(abaControles, 'numeric', 'Value', 10.5,'Tag', 'd_max', 'Position', [160 y0-170 60 24]);
+
+
+
+%% --- Checkboxes de camada ---------------------------------------------
+uilabel(abaControles,'Text','Camadas visíveis:','FontWeight','bold','Position',[280 y0-225 200 22]);
+chk = gobjects(1,7);
+for k = 1:7
+    chk(k) = uicheckbox(abaControles,'Text',sprintf('Camada %d',k), ...
+        'Value',true,'Position',[320 y0-205-45*k 120 22]);
+end
+
+%% --- Sliders + caixas numéricas para anguloCtrl -----------------------
+startY = y0 - 240;
+
+% ➤ Adiciona título para o grupo de sliders
+uilabel(abaControles, ...
+    'Text','Controle Angular α (º por camada):', ...
+    'FontWeight','bold', ...
+    'FontSize', 12, ...
+    'Position',[30 startY+15 300 22]);
+
+sl  = gobjects(1,7);
+box = gobjects(1,7);
+angDefault = [5 -2 -4 -6 -8 -10 -15];
+
+for k = 1:7
+    y = startY - (k-1)*45;
+    sl(k) = uislider(abaControles,'Limits',[-180 180],'Value',angDefault(k),'Position',[30 y 200 3]);
+    box(k) = uieditfield(abaControles,'numeric','Limits',[-180 180],'Value',angDefault(k),'Position',[250 y-12 55 24]);
+    sl(k).ValueChangingFcn = @(s,e)set(box(k),'Value',e.Value);
+    box(k).ValueChangedFcn = @(b,~)set(sl(k),'Value',b.Value);
+end
+
+
+%% --- Campos l2C --------------------------------------------------------
+uilabel(abaControles,'Text','l2C por camada:','FontWeight','bold','Position',[10 130 150 22]);
+l2Field = gobjects(1,7);
+for k = 1:7
+    x = 10 + (k-1)*55;
+    l2Field(k) = uieditfield(abaControles,'numeric','Value',4,'Position',[x 100 45 24],'Limits',[0 Inf]);
+end
+
+%% --- Botões ------------------------------------------------------------
+btnStart = uibutton(abaControles,'Text','▶ Iniciar','FontWeight','bold', ...
+    'Position',[10 35 90 34],'BackgroundColor',[0.15 0.65 0.15],'FontColor','w');
+
+btnStop = uibutton(abaControles,'Text','■ Parar','FontWeight','bold', ...
+    'Position',[110 35 90 34],'BackgroundColor',[0.8 0.2 0.2],'FontColor','w','Enable','off');
+
+btnReset = uibutton(abaControles,'Text','⟳ Resetar','FontWeight','bold', ...
+    'Position',[210 35 90 34],'BackgroundColor',[0.25 0.45 0.9],'FontColor','w');
+
+btnClose = uibutton(abaControles,'Text','✖ Fechar','FontWeight','bold', ...
+    'Position',[310 35 80 34],'BackgroundColor',[0.6 0.1 0.15],'FontColor','w', ...
+    'ButtonPushedFcn',@(~,~)close(fig));
+
+btnUpdate = uibutton(abaControles,'Text','⟳ Atualizar','FontWeight','bold', ...
+    'Position',[270 550 100 34], ...
+    'BackgroundColor',[0.9 0.7 0.1],'FontColor','k', ...
+    'ButtonPushedFcn',@updateCb);
+
+%% --- Aba de Informações ------------------------------------------------
+ % Painel de Informações (aba separada)
+infoText = sprintf([ ...
+    '\n\n', ...
+    '📌 **PARÂMETROS PRINCIPAIS**\n\n', ...
+    '► **l1, l3**: Comprimentos de entrada e saída da estrutura (mm).\n\n', ...
+    '► **l2C**: Comprimento individual de cada camada (mm),\n' ...
+    'definindo a altura da estrutura.\n\n', ...
+    '► **αₖ (alpha_k)**: Ângulo de dobra de cada camada\n' ...
+    'em torno do eixo X. Controla a inclinação das faces.\n\n', ...
+    '► **CamadasX**: Número de réplicas no eixo X,\n' ...
+    'isto é, quantas vezes a estrutura se repete horizontalmente.\n\n', ...
+    '► **Velocidade**: Intervalo (em segundos) entre atualizações da simulação.\n' ...
+    '⚠️ Valores menores tornam a simulação mais rápida.\n' ...
+    'Por exemplo: `0.01` é muito rápido; `1.0` é bem lento.\n\n', ...
+    '► **Passo**: Valor incremental de d por iteração.\n' ...
+    'Define a resolução de movimento da simulação.\n\n', ...
+    '► **d_pause**: Valor de d onde a simulação\n' ...
+    'pausa ou inverte temporariamente a direção.\n\n', ...
+    '► **d_min**: Valor mínimo permitido de abertura (d).\n' ...
+    'Corresponde à garra totalmente aberta (plana).\n\n', ...
+    '► **d_max**: Valor máximo permitido de d.\n' ...
+    'Corresponde à garra completamente fechada.\n\n', ...
+    '► **Camadas Visíveis**: Permite ativar ou ocultar\n' ...
+    'camadas específicas da simulação.\n\n', ...
+    '\n', ...
+    '📊 **FUNCIONALIDADES**\n\n', ...
+    '✅ Visualização 3D responsiva da estrutura articulada.\n', ...
+    '✅ Controle angular independente por camada (αₖ).\n', ...
+    '✅ Exportação para CAD (.stl) e dados numéricos.\n', ...
+    '✅ Painel de métricas com ângulos, abertura e comprimento.\n', ...
+    '✅ Alternância entre visualização e painel de controle.\n\n', ...
+    '📍 Dica: Experimente usar valores contrastantes de αₖ entre camadas\n' ...
+    'para observar padrões assimétricos e não-lineares na estrutura Yoshimura.\n'
+]);
+
+uilabel(abaInfo, ...
+    'Text', infoText, ...
+    'FontSize', 11, ...
+    'FontName', 'Segoe UI', ...
+    'HorizontalAlignment', 'left', ...
+    'Position', [15 60 380 610]);
+
+
+
+%% --- Área de plotagem ---------------------------------------------------
+ax = uiaxes(fig,'Position',[panW+30 60 figSize(1)-panW-40 figSize(2)-130]);
+view(ax,[1 1 1]); axis(ax,'equal'); grid(ax,'on');
+xlabel(ax,'X'); ylabel(ax,'Y'); zlabel(ax,'Z');
+lighting(ax,'gouraud'); material(ax,'dull');
+camlight(ax,'headlight','infinite');
+
+% —————————————— Botões de Exportação ——————————————
+% 1) Botão para exportar dados em CSV
+btnExportData = uibutton(fig, ...
+    'Text','Exportar Dados', ...
+    'Position',[panW-150, 620, 120, 30], ...
+    'BackgroundColor',[0.2 0.6 0.9], 'FontColor','w', ...
+    'ButtonPushedFcn',@exportDataCb);
+
+% 2) Botão para exportar geometria para CAD (STL)
+btnExportCAD = uibutton(fig, ...
+    'Text','Exportar CAD', ...
+    'Position',[panW-150, 670, 120, 30], ...
+    'BackgroundColor',[0.9 0.5 0.1], 'FontColor','w', ...
+    'ButtonPushedFcn',@exportCadCb);
+% ——————————————————————————————————————————————————
+
+
+%% --- Lógicas de Controle ------------------------------------------------
+tSim = timer('ExecutionMode','fixedRate','Period',0.05,'BusyMode','drop');
+d_val = 0; direction = 1;
+
+btnStart.ButtonPushedFcn = @startCb;
+btnStop.ButtonPushedFcn  = @stopCb;
+btnReset.ButtonPushedFcn = @resetCb;
+
+
+% Callback do botão Atualizar (sem resetar a simulação)
+    function updateCb(~,~)
+        l1 = l1Field.Value;
+        l3 = l3Field.Value;
+        camadasX = round(camadasXField.Value);
+        l2C  = arrayfun(@(e)e.Value,l2Field);
+        ang  = arrayfun(@(b)b.Value,box);
+        show = arrayfun(@(c)c.Value,chk);
+
+        runSimulation(ax,l1,l3,l2C,ang,show,d_val,camadasX);
+        drawnow;
+    end
+
+    function startCb(~,~)
+        if strcmp(tSim.Running,'off')
+            vel = velField.Value;
+            tSim.Period = max(vel,0.01);
+            tSim.TimerFcn = @stepSim;
+            btnStart.Enable='off'; btnStop.Enable='on';
+            start(tSim);
+        end
+    end
+
+    function stopCb(~,~)
+        if strcmp(tSim.Running,'on')
+            stop(tSim);
+            btnStart.Enable='on'; btnStop.Enable='off';
+        end
+    end
+
+    function resetCb(~,~)
+        stopCb();
+        l1Field.Value = 10.5; l3Field.Value = 20.5;
+        camadasXField.Value = 2; velField.Value = 0.05;
+        pauseField.Value = 0;
+        passoField.Value = 0.5;
+        pauseTimeField.Value = 1.5;
+        dMinField.Value = 0.1;   % Valor padrão mínimo de d
+        dMaxField.Value = 10.49;  % Valor padrão máximo de d (pode ser l1, por exemplo)
+        for k = 1:7
+            sl(k).Value = angDefault(k);
+            box(k).Value = angDefault(k);
+            chk(k).Value = true;
+            l2Field(k).Value = 4;
+        end
+        cla(ax);
+    end
+
+        function stepSim(~,~)
+        l1 = l1Field.Value;
+        l3 = l3Field.Value;
+        camadasX = round(camadasXField.Value);
+        vel = velField.Value;
+%         fatorA = fatorField.Value;
+        d_pause = pauseField.Value;
+        pause_time = pauseTimeField.Value;
+        d_min = dMinField.Value;
+        d_max = dMaxField.Value;
+%         d_max = l1 * min(fatorA,1);
+        passo = passoField.Value;
+        
+
+        % Pausar brevemente se atingir d_pause, sem alterar direção
+        if abs(d_val - d_pause) < passo/2
+            pause(pause_time);  % apenas pausa sempre que atingir o valor
+        end
+        % Reset flag quando d for diferente de d_pause
+        if abs(d_val - d_pause) >= passo
+            fig.UserData.pausando = false;
+        end
+        
+        % Atualizar d
+        d_val = d_val + direction * passo;
+
+        % Inverter nas extremidades definidas pelo usuário
+        if d_val <= d_min
+        pause(1.5);          % totalmente aberto
+        direction = 1;
+        d_val = d_min;
+    elseif d_val >= d_max
+        pause(0);            % totalmente fechado
+        direction = -1;
+        d_val = d_max;
+    end
+
+
+        % Leitura dos parâmetros visuais
+        l2C  = arrayfun(@(e)e.Value,l2Field);
+        ang  = arrayfun(@(b)b.Value,box);
+        show = arrayfun(@(c)c.Value,chk);
+
+        angRad = runSimulation(ax,l1,l3,l2C,ang,show,d_val,camadasX);
+        angGraus = rad2deg(angRad);
+        strAng = sprintf('θ₁ = %.1f°, θ₂ = %.1f°, θ₃ = %.1f°, θ₄ = %.1f°, θ₅ = %.1f°, θ₆ = %.1f°, θ₇ = %.1f°', angGraus);
+
+        if isfield(fig.UserData,'angText') && isvalid(fig.UserData.angText)
+            fig.UserData.angText.Text = strAng;
+        else
+                fig.UserData.angText = uilabel(fig, ...
+                'Text', strAng, ...
+                'FontSize', 14, ...
+                'FontWeight', 'bold', ...
+                'HorizontalAlignment', 'center', ...
+                'Position', [panW+40, 15, figSize(1)-panW-60, 30]);
+
+        end
+
+        drawnow limitrate
+
+    end
+
+fig.CloseRequestFcn = @(~,~)onClose();
+    function onClose()
+        stopCb();
+        if isvalid(tSim), delete(tSim); end
+        delete(fig);
+    end
+
+
+      %% ——————— Callbacks de exportação ———————
+
+%----------------------------------------------------------------------
+function exportDataCb(~,~)
+    [names, vals, descr] = coletarParametros();
+%     vals = num2cell(vals);
+
+    titulo = {['Relatório Yoshimura  –  ' datestr(now)], '', ''};
+    cab    = {'Parâmetro','Valor','Descrição'};
+    data   = [titulo ; cab ; [names' vals' descr']];
+    nRows  = size(data,1);
+
+    sugg = ['Yoshimura_' datestr(now,'yyyymmdd_HHMMSS') '.xlsx'];
+    [file,path,flt] = uiputfile({'*.xlsx','Excel';'*.csv','CSV'},...
+                                'Salvar relatório', sugg);
+    if isequal(file,0), return; end
+    full = fullfile(path,file);
+
+    if flt==1      % XLSX
+        writecell(data, full, 'Sheet',1,'WriteMode','overwrite');
+        beautifyExcel(full,nRows);
+    else           % CSV
+        writecell(data(3:end,:), full, ...
+                  'Delimiter',';','FileType','text', ...
+                  'QuoteStrings',false,'DecimalSeparator',',');
+    end
+    uialert(fig,'Relatório exportado com sucesso!','Exportação');
+end
+%----------------------------------------------------------------------
+
+
+%----------------------------------------------------------------------
+function exportCadCb(~,~)
+    
+    % Atualiza a simulação antes de exportar
+    l1 = l1Field.Value;
+    l3 = l3Field.Value;
+    camadasX = round(camadasXField.Value);
+    l2C  = arrayfun(@(e)e.Value,l2Field);
+    ang  = arrayfun(@(b)b.Value,box);
+    show = arrayfun(@(c)c.Value,chk);
+
+    runSimulation(ax, l1, l3, l2C, ang, show, d_val, camadasX);
+    drawnow;
+
+    fig = ancestor(ax, 'figure');
+    if ~isfield(fig.UserData, 'data') || ...
+       isempty(fig.UserData.data.faces) || ...
+       isempty(fig.UserData.data.pts)
+        uialert(fig,'Nenhuma geometria disponível para exportar.','Erro');
+        return;
+    end
+
+    [file, path] = uiputfile('*.stl','Salvar arquivo STL');
+    if isequal(file,0), return; end
+
+    TR = triangulation(fig.UserData.data.faces, fig.UserData.data.pts);
+    stlwrite(TR, fullfile(path, file));
+    
+    fig.UserData.lastSTL = fullfile(p,f);   % acrescentar antes do uialert
+
+    uialert(fig,'Arquivo STL exportado com sucesso.','Exportação OK');
+end
+%===================== coleta + descrição =================================
+function [names, vals, descr] = coletarParametros()
+
+    % ----- parâmetros básicos -------------------------------------------
+    names = {'l1_mm','l3_mm','numReplicas_X','timerPeriod_s','step_d_mm',...
+             'd_min_mm','d_max_mm','d_pause_mm','pauseTime_s'};
+    vals  = { l1Field.Value ,  l3Field.Value , round(camadasXField.Value), ...
+              velField.Value, passoField.Value, ...
+              dMinField.Value, dMaxField.Value, pauseField.Value, pauseTimeField.Value};
+    descr = { 'Comprimento l1 da célula (mm)', ...
+              'Comprimento l3 da célula (mm)', ...
+              'Nº de réplicas no eixo X', ...
+              'Período do timer (s)', ...
+              'Passo de avanço de d (mm)', ...
+              'Limite mínimo de d (mm)','Limite máximo de d (mm)', ...
+              'Valor de d onde pausa','Duração da pausa (s)'};
+
+    % ----- por camada ----------------------------------------------------
+    for k = 1:7
+        names = [names , sprintf('theta_%d_deg',k), sprintf('l2C_%d_mm',k), sprintf('camada_%d_ON',k)];
+        vals  = [vals  ,  box(k).Value           ,  l2Field(k).Value      ,  chk(k).Value];
+        descr = [descr , {sprintf('Ângulo camada %d (°)',k), ...
+                           sprintf('l2C camada %d (mm)',k), ...
+                           sprintf('Camada %d visível? 1/0',k)}];
+    end
+
+    % ----- métricas extra -----------------------------------------------
+    l1 = l1Field.Value; h = sqrt(l1^2 - d_val^2);
+    extras = { ...
+        'camadasON_total', sum([chk.Value]),         'Total de camadas visíveis'; ...
+        'theta1_norm',    (box(1).Value+180)/360,    'θ₁ normalizado 0–1'; ...
+        'alturaTotal_mm', h + l2Field(1).Value,      'Altura aproximada (mm)'; ...
+        'anguloAbertura_deg', box(1).Value-box(7).Value, 'θ₁ – θ₇ (°)'; ...
+        'd_current_mm',   d_val,                     'Valor atual de d (mm)'; ...
+        'runtime_s',      toc(lastTime),             'Tempo de execução (s)'; ...
+        'fps_avg',        fpsAvg(),                  'FPS médio'; ...
+        'fps_inst',       fpsInst(),                 'FPS instantâneo'; ...
+        'mesh_vertices',  meshInfo('V'),             'Vértices malha STL'; ...
+        'mesh_faces',     meshInfo('F'),             'Faces malha STL'; ...
+        'driverVersion',  version,                   'Versão do MATLAB'; ...
+        'arquivoSTL_gerado', lastSTL(),              'Último STL salvo' };
+    names = [names , extras(:,1)'];
+    vals  = [vals  , extras(:,2)'];
+    descr = [descr , extras(:,3)'];
+end
+% helpers locais
+function v = fpsAvg,  v = NaN; if numel(fig.UserData.t)>2, v = 1/mean(diff(fig.UserData.t)); end, end
+function v = fpsInst, v = NaN; if numel(fig.UserData.t)>2, v = 1/diff(fig.UserData.t(end-1:end)); end, end
+function o = meshInfo(c), o = 0; if isfield(fig.UserData,'data')&&~isempty(fig.UserData.data), ...
+        if c=='V', o=size(fig.UserData.data.pts,1); else, o=size(fig.UserData.data.faces,1); end, end, end
+function p = lastSTL, if isfield(fig.UserData,'lastSTL'), p=fig.UserData.lastSTL; else, p=''; end, end
+%========================================================================
+
+%=================== formatação no Excel (ActiveX) =======================
+function beautifyExcel(xlsxFile, nRows)
+    try
+        ex = actxserver('Excel.Application'); ex.Visible = false;
+        wb = ex.Workbooks.Open(xlsxFile);     ws = wb.Worksheets.Item(1);
+
+        ws.Range('A1:C1').MergeCells = true;
+        ws.Range('A1').Font.Bold = true; ws.Range('A1').Font.Size = 14;
+        ws.Range('A2:C2').Font.Bold = true;
+
+        last = sprintf('C%d',nRows);
+        tbl  = ws.ListObjects.Add(1,ws.Range(['A2:' last]),[],1);
+        tbl.TableStyle = 'TableStyleMedium2';
+
+        ws.Columns.AutoFit; wb.Save; wb.Close; ex.Quit;
+    catch, end
+end
+%========================================================================
+
+end
+
+%% ===================== FUNÇÕES DE GEOMETRIA ============================
+function  [angulosRad, faces, pts] = runSimulation(ax, l1, l3, l2C, angCtrl, showLayer, d, camadasX)
+l4   = l3 - l2C(1);
+rotX = @(a)[1 0 0;0 cos(a) -sin(a);0 sin(a) cos(a)];
+adjAng = @(P0,P1,nv,c)deg2rad(max(min(rad2deg( ...
+         atan2(norm(cross(P1-P0,P1+nv-P1)),dot(P1-P0,P1+nv-P1))) ...
+         *c/10,180),-180));
+
+alphaMap = struct('b',0.95,'g',0.7);  % transparência
+
+h = sqrt(l1^2-d^2); if ~isfinite(h), return; end
+O1 = [0 0 0]; O0 = [0 -l2C(1) 0];
+A0 = [ d -l2C(1) -h]; B0 = [-d -l2C(1) -h];
+A1 = [ d      l4 -h]; B1 = [-d      l4 -h];
+
+[~,~,nv] = calcFoldedTip(d,l1,l4);
+
+g1 = adjAng(A0, A1, nv, angCtrl(1));
+Px = O1 + (rotX(g1)*nv.').';
+A2 = Px + (A1 - O1)-[0,l4 - l2C(1),0];
+B2 = Px + (B1 - O1) - [0,l4 - l2C(1),0];
+P  = Px + (Px-O0);
+
+O0_2 = P; 
+O1_2 = P+[0 l2C(2) 0];
+A0_2 = A1; B0_2 = B1; 
+A1_2 = A2; B1_2 = B2;
+g2 = adjAng(A0_2, A1_2, nv, angCtrl(2));
+P2 = O0_2 + (rotX(g2)*nv.').';
+A2_2 = P2+(A1_2 - O1_2) - [0,-l4-l2C(2),0];
+B2_2 = P2+(B1_2 - O1_2) - [0,-l4-l2C(2),0];
+
+O0_3  =P2 + [0 l2C(3) 0]; 
+O1_3 = P2+[0 l4 0];
+A0_3 = A1_2; B0_3 = B1_2; 
+A1_3 = A2_2; B1_3 = B2_2;
+g3 = adjAng(A0_3, A1_3, nv, angCtrl(3));
+P3 = O1_3 + (rotX(g3)*nv.').';
+A2_3 = P3 + (A1_3 - O1_3) - [0,l4 - l2C(3),0];
+B2_3 = P3 + (B1_3 - O1_3) - [0,l4 - l2C(3),0];
+
+O0_4 = P3; 
+O1_4 = P3 + [0 l2C(4) - l4 0];
+A0_4 = A1_3; B0_4 = B1_3; 
+A1_4 = A2_3; B1_4 = B2_3;
+g4 = adjAng(A0_4, A1_4, nv, angCtrl(4));
+P4 = O0_4 + (rotX(g4)*nv.').';
+A2_4 = P4 + (A1_4 - O1_4);
+B2_4 = P4 + (B1_4 - O1_4);
+
+O0_5 = P4; 
+O1_5 = P4 - [0 l2C(5) 0];
+A0_5 = A1_4; B0_5 = B1_4; 
+A1_5 = A2_4; B1_5 = B2_4;
+g5 = adjAng(A0_5, A1_5, nv, angCtrl(5));
+P5 = O0_5 + (rotX(g5)*nv.').';
+A2_5 = P5 + (A1_5 - O1_5) - [0,l4 + l2C(5),0];
+B2_5 = P5 + (B1_5 - O1_5) - [0,l4 + l2C(5),0];
+
+O0_6 = P5; 
+O1_6 = P5 - [0 l2C(6) + l4 0];
+A0_6 = A1_5; B0_6=B1_5; 
+A1_6 = A2_5; B1_6=B2_5;
+g6 = adjAng(A0_6, A1_6, nv, angCtrl(6));
+P6 = O0_6 + (rotX(g6)*nv.').';
+A2_6 = P6+(A1_6 - O1_6) + [0, -l4, 0];
+B2_6 = P6+(B1_6 - O1_6) + [0, -l4, 0];
+
+O0_7 = P6 + [0 l2C(7) 0]; 
+O1_7 = P6 + [0 l2C(7) - 2*l4 0];
+A0_7 = A1_6; B0_7 = B1_6; 
+A1_7 = A2_6; B1_7 = B2_6;
+g7 = adjAng(A0_7, A1_7, nv,angCtrl(7));
+P7 = O1_7 + (rotX(g7)*nv.').';
+A2_7 = P7 + (A1_7 - O1_7) - [0, l4, 0];
+B2_7 = P7 + (B1_7 - O1_7) - [0, l4, 0];
+
+faces={};
+if showLayer(1)
+    faces=[faces; {[O0;A0;A1;O1],'b'}; {[O0;B0;B1;O1],'b'}; ...
+                   {[O1;A1;A2;P ],'g'}; {[O1;B1;B2;P ],'g'}];
+end
+if showLayer(2)
+    faces=[faces; {[O0_2;A1_2;A2_2;O1_2],'b'}; {[O0_2;B1_2;B2_2;O1_2],'b'}; ...
+                   {[O1_2;A1_3;A2_3;O1_3],'g'}; {[O1_2;B1_3;B2_3;O1_3],'g'}];
+end
+if showLayer(3)
+    faces=[faces; {[O1_3;A1_4;A2_4;O1_4],'b'}; {[O1_3;B1_4;B2_4;O1_4],'b'}];
+end
+if showLayer(4)
+    faces=[faces; {[O1_4;A1_5;A2_5;O1_5],'g'}; {[O1_4;B1_5;B2_5;O1_5],'g'}];
+end
+if showLayer(5)
+    faces=[faces; {[O1_5;A1_6;A2_6;O1_6],'b'}; {[O1_5;B1_6;B2_6;O1_6],'b'}];
+end
+if showLayer(6)
+    faces=[faces; {[O1_6;A1_7;A2_7;O1_7],'g'}; {[O1_6;B1_7;B2_7;O1_7],'g'}];
+end
+
+cla(ax); hold(ax,'on');
+
+for dx = 0:(camadasX-1)      % replicação eixo X
+    for f = 1:size(faces,1)
+        V = faces{f,1};  c = faces{f,2};
+        drawFace(ax,V,c,dx*2*d,l2C(1),alphaMap);
+    end
+end
+axis(ax,[-150 150 -150 150 -150 150]);
+view(ax,[1 1 1]);
+
+fig = ancestor(ax,'figure'); % isso recupera a figura associada ao uiaxes
+
+
+%% --- TÍTULO SIMPLIFICADO ------------------------------------------------
+title(ax, {
+    ['Varaiação do Parâmetro de Abertura (d = ' num2str(d, '%.2f') ' mm)']
+});
+
+angulosRad = [g1, g2, g3, g4, g5, g6, g7];
+
+%% --- Criação da malha 3D com espessura (extrusão) ------------------------
+%% --- Criação da malha 3D com espessura (extrusão) ------------------------
+%  (Agora com replicação em X e espelhamento em Y)
+
+if isempty(faces)
+    warning('Nenhuma face definida. Exportação cancelada.');
+    angulosRad = zeros(1,7);
+    return;
+end
+
+% ——— parâmetros de extrusão e canal (precisam estar no escopo) ———
+espessura    = 0.40;   % espessura da placa (mm)
+espVinco     = 0.80;   % profundidade EXTRA do canal (mm)
+larguraVinco = 0.40;   % largura total do canal (mm)
+% ————————————————————————————————————————————% ————————————————————————————————————————————————
+
+vertexList  = [];
+faceTriList = [];
+
+l2Shift   = l2C(1);        % deslocamento em Y usado no drawFace
+nRepX     = camadasX;      % número de cópias no eixo X
+dStep     = 2*d;           % deslocamento X entre repetições
+edgeHash = containers.Map('KeyType','char','ValueType','logical');
+
+
+for ix = 0:nRepX-1                % ► REPLICAÇÕES X
+    dx = ix*dStep;                % deslocamento atual em X
+
+    for mirror = [ 1  -1 ]        % ► espelho em Y  (+1 = original, -1 = espelhado)
+        sY = mirror;
+        yOff =  sY*l2Shift;       % mesmo deslocamento usado no drawFace
+
+        for f = 1:size(faces,1)   % ► todas as faces visíveis
+            Vraw = faces{f,1};    % vértices originais da face
+
+            % -- aplica transformações (espelho + deslocamentos)
+            if sY > 0            % lado “original” (mesma orientação)
+                V = Vraw;
+            else                 % lado espelhado (inverte X e Y)
+                V = [-Vraw(:,1), -Vraw(:,2), Vraw(:,3)];
+            end
+            V(:,1) = V(:,1) + dx;      % replica em X
+            V(:,2) = V(:,2) + yOff;    % desloca em Y
+
+            nV = size(V,1);
+            
+            % ▸ Topo (original)
+            baseTop = size(vertexList,1);
+            vertexList = [vertexList; V];
+
+            % ▸ Fundo (Z deslocado)
+            Vbot = V;  Vbot(:,3) = Vbot(:,3) - espessura;
+            baseBot = size(vertexList,1);
+            vertexList = [vertexList; Vbot];
+
+            % ▸ Faces superiores e inferiores
+            if nV == 4
+                faceTriList = [faceTriList;
+                    baseTop + [1 2 3];  baseTop + [1 3 4];     % topo
+                    baseBot + [1 3 2];  baseBot + [1 4 3]];    % fundo (invertido)
+            elseif nV == 3
+                faceTriList = [faceTriList;
+                    baseTop + [1 2 3];
+                    baseBot + [1 3 2]];
+            end
+
+            % ▸ Laterais da extrusão
+            for i = 1:nV
+                i2 = mod(i,nV)+1;
+                vt1 = baseTop + i;
+                vt2 = baseTop + i2;
+                vb1 = baseBot + i;
+                vb2 = baseBot + i2;
+
+                faceTriList = [faceTriList;
+                    vt1 vb1 vb2;
+                    vt1 vb2 vt2];
+            end
+        end
+    end
+end
+
+%% --- Salva no UserData para exportação em STL
+fig = ancestor(ax,'figure');
+if isvalid(fig)
+    fig.UserData.data.faces = faceTriList;
+    fig.UserData.data.pts   = vertexList;
+end
+
+end
+
+%% --- utilidades ---------------------------------------------------------
+function [Py,Pz,nv] = calcFoldedTip(d,l1,l4)
+
+if d <= 1e-4
+    Py = NaN; Pz = NaN; nv = [NaN NaN NaN];
+    return;
+end
+h = sqrt(l1^2-d^2); 
+K = (d^2+2*l4^2+h^2-l1^2)/2; 
+a = h^2 + l4^2;
+b = 2*K*h; 
+c = K^2 - l4^4; 
+delta = b^2 - 4*a*c;
+if delta<0, Py=NaN;Pz=NaN;nv=[NaN NaN NaN];return;end
+Pz = (-b - sqrt(delta))/(2*a); Py = sqrt(l4^2 - Pz^2);
+nv = [0 Py Pz]/norm([0 Py Pz])*l4;
+end
+
+function drawFace(ax, V, c, dx, l2, alpha)
+    patch(ax, real(V(:,1)+dx), real(V(:,2)+l2), real(V(:,3)), c, ...
+          'FaceAlpha', alpha.(c), ...
+          'EdgeColor', 'k', 'LineWidth', 0.6);
+    
+    patch(ax, real(-V(:,1)+dx), real(-V(:,2)-l2), real(V(:,3)), c, ...
+          'FaceAlpha', alpha.(c), ...
+          'EdgeColor', 'k', 'LineWidth', 0.6);
+end
