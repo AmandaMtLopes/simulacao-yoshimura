@@ -173,7 +173,6 @@ uilabel(abaInfo, ...
     'Position', [15 60 380 610]);
 
 
-
 %% --- Área de plotagem ---------------------------------------------------
 ax = uiaxes(fig,'Position',[panW+30 60 figSize(1)-panW-40 figSize(2)-130]);
 view(ax,[1 1 1]); axis(ax,'equal'); grid(ax,'on');
@@ -195,7 +194,6 @@ btnExportCAD = uibutton(fig, ...
     'Position',[panW-150, 670, 120, 30], ...
     'BackgroundColor',[0.9 0.5 0.1], 'FontColor','w', ...
     'ButtonPushedFcn',@exportCadCb);
-% ——————————————————————————————————————————————————
 
 
 %% --- Lógicas de Controle ------------------------------------------------
@@ -327,8 +325,6 @@ fig.CloseRequestFcn = @(~,~)onClose();
 
 
       %% ——————— Callbacks de exportação ———————
-
-%----------------------------------------------------------------------
 function exportDataCb(~,~)
     [names, vals, descr] = coletarParametros();
 %     vals = num2cell(vals);
@@ -356,8 +352,6 @@ function exportDataCb(~,~)
 end
 %----------------------------------------------------------------------
 
-
-%----------------------------------------------------------------------
 function exportCadCb(~,~)
     
     % Atualiza a simulação antes de exportar
@@ -440,7 +434,6 @@ function v = fpsInst, v = NaN; if numel(fig.UserData.t)>2, v = 1/diff(fig.UserDa
 function o = meshInfo(c), o = 0; if isfield(fig.UserData,'data')&&~isempty(fig.UserData.data), ...
         if c=='V', o=size(fig.UserData.data.pts,1); else, o=size(fig.UserData.data.faces,1); end, end, end
 function p = lastSTL, if isfield(fig.UserData,'lastSTL'), p=fig.UserData.lastSTL; else, p=''; end, end
-%========================================================================
 
 %=================== formatação no Excel (ActiveX) =======================
 function beautifyExcel(xlsxFile, nRows)
